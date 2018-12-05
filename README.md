@@ -1,2 +1,3 @@
 # TCChat
-TC Chat in Go
+Projet de chat client-serveur en Go.
+3TC INSA Lyon
