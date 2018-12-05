@@ -37,17 +37,19 @@ func serv_react(message string, ip int) error {
 }
 
 func registerUser (nickname string, ip int) {
-  fmt.Println ("%v est connecté avec le nom : %v", ip, nickname)
+  fmt.Println (ip, "est connecté avec le nom :", nickname)
 }
 
 func broadcast (msg string) {
-  fmt.Println (" BROADCAST : %v", msg)
+  fmt.Println (" BROADCAST :", msg)
 }
 
 func disconnect (ip int) {
-  fmt.Println ("disconnect %v", ip)
+  fmt.Println ("disconnect ", ip)
 }
 
-/*type user struct {
-  ip int
-}*/
+func main () {
+	arg1 := "TCCHAT_DISCONNECT\tDamon!\n"
+	arg2 := 127000
+	serv_react (arg1, arg2)
+}
