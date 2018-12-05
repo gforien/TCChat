@@ -2,52 +2,70 @@
 package main
 
 import (
-  "errors"
-  "strings"
-  "fmt"
+	"errors"
+	"strings"
+	"fmt"
 )
 
 func serv_react(message string, ip int) error {
 
-  var msgPieces []string
-  msgPieces = strings.SplitN(message, "\t",3)
+	var msgPieces []string
+	typeMsg := ""
+	argMsg1 := ""
+	argMsg2 := ""
 
-  var typeMsg string
-  typeMsg = msgPieces[0]
+	msgPieces = strings.SplitN(message, "\n",1)
+	msgPieces = strings.SplitN(msgPieces[0], "\t",3)
 
-  msgPieces = strings.SplitN(msgPieces[1], "\n",1)
+	if len(msgPieces) < 2 {
+		return  errors.New("Not enough message's arguments");
+	}
 
-  var argMsg1 string
-  argMsg1 = msgPieces[0]
-  var argMsg2 string
-  argMsg2 = msgPieces[1]
+	typeMsg = msgPieces[0]
+	argMsg1 = msgPieces[1]
+	if len(msgPieces) > 2 {
+		argMsg2 = msgPieces [2]
+	}
 
-  switch typeMsg {
-  case "TCCHAT_WELCOME":
-  case "TCCHAT_USERIN" :
-  case "TCCHAT_USEROUT":
-  case "TCCHAT_BCAST":
-  default :
-    var err error
-    err = errors.New("Undefined Type of message")
-    return err;
-  }
+	switch typeMsg {
+	case "TCCHAT_WELCOME":
+		welcome(argMsg1)
+	case "TCCHAT_USERIN":
+		userin(argMsg1)
+	case "TCCHAT_USEROUT":
+		userout(argMsg1)
+	case "TCCHAT_BCAST":
+		if argMsg2 == "" {
+			return  errors.New("Not enough message's arguments");
+		}
+		newMessage(argMsg1,argMsg2)
+	default :
+		return  errors.New("Undefined Type of message");
+	}
 
-  return nil
+	return nil
 }
 
-func registerUser (nickname string, ip int) {
-  fmt.Println ("%v est connecté avec le nom : %v", ip, nickname)
+
+func welcome(nom_serv string) {
+	fmt.Println("connecté au serveur :", nom_serv)
 }
 
-func broadcast (msg string) {
-  fmt.Println (" BROADCAST : %v", msg)
+func userin (nom_user string) {
+	fmt.Println(nom_user, "rejoin le serveur")
 }
 
-func disconnect (ip int) {
-  fmt.Println ("disconnect %v", ip)
+func userout (nom_user string) {
+	fmt.Println(nom_user, "est OUT #Micdrop")
 }
 
-/*type user struct {
-  ip int
-}*/
+func newMessage (nom_user string, message string) {
+	fmt.Println(nom_user, ":", message)
+}
+
+func main () {
+	message := "TCCHAT_WELCOME\t the lul-server \tje suis un message avec\tune tabulation (\\t)\n"
+	ip := 127000
+	err := serv_react (message, ip)
+	fmt.Println (err)
+}
