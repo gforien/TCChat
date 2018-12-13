@@ -5,7 +5,11 @@ import (
 	"errors"
 	"strings"
 	"fmt"
+	"net"
+	"bufio"
 )
+
+users := make(map[string]string)
 
 func serv_react(message string, ip string) error {
 	var msgPieces []string
@@ -49,15 +53,31 @@ func serv_react(message string, ip string) error {
 
 
 func registerUser (nickname string, ip string) {
-	fmt.Println (ip, "est connecté avec le nom :", nickname)
+	_,isYetConnect := users[ip]
+	if (isYetConnect) {
+		disconnect(ip)
+	}else {
+		users[ip] = nickname
+		msg := "TCCHAT_USERIN\t"+nickname+"\n"
+		sendMessage (msg,"")
+	}
 }
 
 func broadcast (msg string) {
-	fmt.Println (" BROADCAST :", msg)
+	msg := "TCCHAT_BCAST\t"+nickname+"\t"+msg+"\n"
+	sendMessage (msg,"")
 }
 
 func disconnect (ip string) {
-	fmt.Println ("disconnect ", ip)
+	nickname := users[ip]
+	msg := "TCCHAT_USEROUT\t"+nickname+"\n"
+	sendMessage (msg,"")
+	delete (users, ip)
+
+}
+
+func sendMessage (message string, ip string) {
+	// A la place d'utiliser cette methode, envoyer le message dans un channel
 }
 
 func main () {
