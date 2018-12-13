@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func serv_react(message string, ip int) error {
+func serv_react(message string, ip string) error {
 
 	var msgPieces []string
 	typeMsg := ""
@@ -49,6 +49,12 @@ func serv_react(message string, ip int) error {
 }
 
 
+
+
+
+
+
+
 func welcome(nom_serv string) {
 	fmt.Println("connecté au serveur :", nom_serv)
 }
@@ -67,7 +73,7 @@ func newMessage (nom_user string, message string) {
 
 func main () {
 	message := "TCCHAT_WELCOME\t the lul-server \tje suis un message avec\tune tabulation (\\t)\n"
-	ip := 127000
+	ip := "127.0.0.0"
 	err := serv_react (message, ip)
 	fmt.Println (err)
 }

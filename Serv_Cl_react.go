@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func serv_react(message string, ip int) error {
+func serv_react(message string, ip string) error {
 	var msgPieces []string
 	typeMsg := ""
 	argMsg := ""
@@ -44,7 +44,11 @@ func serv_react(message string, ip int) error {
 	return nil
 }
 
-func registerUser (nickname string, ip int) {
+
+
+
+
+func registerUser (nickname string, ip string) {
 	fmt.Println (ip, "est connecté avec le nom :", nickname)
 }
 
@@ -52,13 +56,13 @@ func broadcast (msg string) {
 	fmt.Println (" BROADCAST :", msg)
 }
 
-func disconnect (ip int) {
+func disconnect (ip string) {
 	fmt.Println ("disconnect ", ip)
 }
 
 func main () {
 	message := "TCCHAT_MESSAGE\tDamon\tje suis un message avec \t une tabulation (\\t)\n"
-	ip := 127000
+	ip := "127.0.0.0"
 	err := serv_react (message, ip)
 	fmt.Println (err)
 }
