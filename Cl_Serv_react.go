@@ -36,7 +36,9 @@ func serv_react(message string, ip int) error {
 		userout(argMsg1)
 	case "TCCHAT_BCAST":
 		if argMsg2 == "" {
-			return  errors.New("Not enough message's arguments");
+			return  errors.New("Empty message");
+		} else if len(argMsg2) > 140 {
+			return  errors.New("Message Payload over 140 character");
 		}
 		newMessage(argMsg1,argMsg2)
 	default :

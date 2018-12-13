@@ -29,6 +29,9 @@ func serv_react(message string, ip int) error {
 		}
 		registerUser (msgPieces[0],ip);
 	case "TCCHAT_MESSAGE" :
+		if len(argMsg) > 140 {
+			return  errors.New("Message Payload over 140 character");
+		}
 		broadcast (argMsg)
 	case "TCCHAT_DISCONNECT":
 		disconnect (ip)
