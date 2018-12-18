@@ -3,6 +3,7 @@ package main
 import "net"
 import "fmt"
 import "bufio"
+import "strings"
 //import "os"
 
 func main() {
@@ -35,6 +36,7 @@ func getMsg(conn net.Conn, msgChan chan string) {
     reader := bufio.NewReader(conn)
     for {
         text, err := reader.ReadString('\n')
+        text = strings.TrimSuffix(text, "\n")
         if err != nil {
             panic(err)
         }

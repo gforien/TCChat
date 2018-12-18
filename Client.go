@@ -4,10 +4,11 @@ import "net"
 import "fmt"
 import "bufio"
 import "os"
+import "strings"
 
 func main() {
 
-    // connection to localhost on port 8081
+    // connection to localhost on port 2000
     conn, err := net.Dial("tcp", "127.0.0.1:2000")
     if err != nil {
         panic(err)
@@ -34,6 +35,7 @@ func receiveInput(inputChan chan string) {
     for {
         fmt.Print("Text to send: ")
         text, err := reader.ReadString('\n')
+        text = strings.TrimSuffix(text, "\n")
         if err != nil {
             panic(err)
         }
