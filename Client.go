@@ -133,9 +133,13 @@ func userin (nom_user string) {
 
 func userout (nom_user string) {
 	fmt.Println(nom_user, "est OUT #Micdrop")
-	for j := 0; j <= len(nom_user); j++ {
-		//pas fini
-   }
+	for i := 0; i<len(userName); i++ {
+		if (userName[i] == nom_user) {
+			i = len(nom_user)
+			userName[i] = userName[len(userName)-1]
+			userName = userName[:len(userName)-1]
+		}
+	}
 }
 
 func newMessage (nom_user string, message string) {
