@@ -36,21 +36,23 @@ func main() {
     for {
         select {
 
-        case onConnection := <-connectChan:
+        case onConnection, ok := <-connectChan:
+                        if !ok {
+                fmt.Println("Channel is closed !")
+                break
+            }
             fmt.Println("NEW CONN")
-            go sendMessage(Client{conn: onConnection, name : "undefined"}, "TCCHAT_WELCOME\t"+serverName)
+//            go sendMessage(Client{conn: onConnection, name : "undefined"}, "TCCHAT_WELCOME\t"+serverName)
             go getMsg(onConnection, msgChan)
 
-        case onMessage := <-msgChan:
+        case onMessage, ok := <-msgChan:
+                        if !ok {
+                fmt.Println("Channel is closed !")
+                break
+            }
             fmt.Println("NEW MSG: ", onMessage)
 
-        case onBroadcast := <-broadcastChan:
-            for _, client := range aConn {
-                go sendMessage(client, onBroadcast)
-            }
 
-        case onInput := <-inputChan:
-            fmt.Println("NEW INPUT: ", onInput)
         }
     }
 }
@@ -60,6 +62,7 @@ func getMsg(conn net.Conn, msgChan chan string) {
     reader := bufio.NewReader(conn)
 
     for {
+        fmt.Println("Listening on user "+conn.RemoteAddr().String())
         text, err := reader.ReadString('\n')
         text = strings.TrimSuffix(text, "\n")
         if err != nil {
@@ -75,12 +78,13 @@ func getMsg(conn net.Conn, msgChan chan string) {
 
         case "TCCHAT_REGISTER":
             registerUser(conn, msgPieces[1]);
+            conn.Write([]byte("TCCHAT_WELCOME\tLe chat de TC\n"))
 
         case "TCCHAT_MESSAGE":
             if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                 panic("Error: Received message doesn't respect TC-Chat protocol.")
             }
-            broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
+            msgChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
 
         case "TCCHAT_DISCONNECT":
             fmt.Println("TCCHAT_DISCONNECT")
@@ -98,7 +102,7 @@ func getConn(listener net.Listener) {
             panic(err)
         }
 
-        connectChan <- conn
+        go func() {connectChan <- conn}()
     }
 }
 
@@ -106,8 +110,9 @@ func getConn(listener net.Listener) {
 
 func registerUser(connReceived net.Conn, nameReceived string) {
     aConn = append(aConn, Client{conn: connReceived, name: nameReceived})
-    userInMessage := "TCCHAT_USERIN\t"+nameReceived
-    broadcastChan <- userInMessage
+    msgChan <- "TCCHAT_USERIN\t"+nameReceived
+    //userInMessage := "TCCHAT_USERIN\t"+nameReceived
+    //broadcastChan <- userInMessage
 }
 
 func sendMessage(client Client, msg string) {
