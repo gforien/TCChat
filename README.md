@@ -11,3 +11,7 @@ Projet de chat client-serveur en Go.
 - Downloader les modifications que n'importe qui aurait pu ajouter au projet, et enfin uploader ses propres modifications
 - ```git pull```
 - ```git push```
+- Créer une branche, càd une "copie" du projet sur laquelle on devellope sans changer la branche principale (souvent pour conserver une version qui marche et avoir une version de développement)
+- ```git checkout -b [nom de la nouvelle branche]```
+- Changer de branche /!\ toujours |pull - commit - push| avant de changer de branches
+- ```git checkout [nom branche]```
