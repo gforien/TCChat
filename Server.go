@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"bufio"
 	"strings"
+	"errors"
 )
 
 type Client struct {
@@ -20,6 +21,8 @@ var (
 	connectChan = make(chan net.Conn)
 	msgChan = make(chan string)
 	broadcastChan = make(chan string)
+
+	protocolError = errors.New("Received message doesn't respect TC-Chat protocol.")
 )
 
 func main() {
@@ -35,11 +38,10 @@ func main() {
 	// mainloop
 	for {
 		select {
-
 		case onConnection := <-connectChan:
 			fmt.Println("NEW CONN")
 			go sendMessage(Client{conn: onConnection, name : "undefined"}, "TCCHAT_WELCOME\t"+serverName)
-			go getMsg(onConnection, msgChan)
+			go getMsg(onConnection)
 
 		case onMessage := <-msgChan:
 			fmt.Println("NEW MSG: ", onMessage)
@@ -55,7 +57,7 @@ func main() {
 	}
 }
 
-func getMsg(conn net.Conn, msgChan chan string) {
+func getMsg(conn net.Conn) {
 	var msgPieces []string
 	reader := bufio.NewReader(conn)
 
@@ -74,21 +76,20 @@ func getMsg(conn net.Conn, msgChan chan string) {
 		switch msgPieces[0] {
 
 		case "TCCHAT_REGISTER":
-			registerUser(conn, msgPieces[1]);
+			// TEST IF CLIENT EXIST YET (if true, disconnect the client, send UserOut)
+			aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
+			broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
 
 		case "TCCHAT_MESSAGE":
-			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
-				panic("Error: Received message doesn't respect TC-Chat protocol.")
-			}
+			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {panic(protocolError)}
 			broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
 
 		case "TCCHAT_DISCONNECT":
 			fmt.Println("TCCHAT_DISCONNECT")
+
+		default panic (protocolError)
 		}
 	}
-}
-
-func getInput() {
 }
 
 func getConn(listener net.Listener) {
@@ -102,13 +103,6 @@ func getConn(listener net.Listener) {
 	}
 }
 
-/* Users/Messages - related function */
-
-func registerUser(connReceived net.Conn, nameReceived string) {
-	aConn = append(aConn, Client{conn: connReceived, name: nameReceived})
-	userInMessage := "TCCHAT_USERIN\t"+nameReceived
-	broadcastChan <- userInMessage
-}
 
 func sendMessage(client Client, msg string) {
 	client.conn.Write([]byte(msg + "\n"))
