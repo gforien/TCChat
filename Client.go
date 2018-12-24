@@ -34,7 +34,7 @@ func main() {
 	nickname, err := reader.ReadString('\n')
 	if err != nil {panic(err)}
 	nickname = strings.TrimSuffix(nickname, "\n")
-	if "" == nickname {nickname = "defaulName"}
+	if "" == nickname {nickname = "defaultName"}
 
 	//create a file for displaying server's message
 	f, errFile := os.Create("/tmp/TCChat_"+nickname) // acces the file with : tail -f /tmp/TCChat_[nickname]
@@ -69,7 +69,7 @@ func main() {
 				fmt.Println("Channel is closed !")
 				break
 			}
-			_ , err := f.WriteString(msg)
+			_ , err := f.WriteString(msg+"\n")
 			if err != nil {panic(err)}
 		}
 	}

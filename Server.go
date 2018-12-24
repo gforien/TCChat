@@ -14,7 +14,7 @@ type Client struct {
 }
 
 var (
-	aConn = make([]Client, 1)
+	aConn = make([]Client, 0)
 	serverName = "TCChat Server"
 	// channels definition
 	inputChan = make(chan string)
@@ -47,8 +47,8 @@ func main() {
 			fmt.Println("NEW MSG: ", onMessage)
 
 		case onBroadcast := <-broadcastChan:
-			for _, client := range aConn {
-				go sendMessage(client, onBroadcast)
+			for i := 0; i<len(aConn); i++ {
+				go sendMessage(aConn[i], onBroadcast)
 			}
 
 		case onInput := <-inputChan:
@@ -70,24 +70,42 @@ func getMsg(conn net.Conn) {
 
 		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
 		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == ""{
-			panic("Error: Received message doesn't respect TC-Chat protocol.")
+			panic(protocolError)
 		}
 
 		switch msgPieces[0] {
 
 		case "TCCHAT_REGISTER":
-			// TEST IF CLIENT EXIST YET (if true, disconnect the client, send UserOut)
-			aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
-			broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
+			notYetConnect := true
+			for i := 0; i<len(aConn); i++ {
+				if msgPieces[1] == aConn[i].name {
+					i = len(aConn)
+					notYetConnect = false
+					aConn[i].conn.Close()
+					aConn = append(aConn[:i], aConn[i+1:]...)
+					broadcastChan <- "TCCHAT_USEROUT\t"+msgPieces[1]
+				}
+			}
+			if notYetConnect {
+				aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
+				broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
+			}
 
 		case "TCCHAT_MESSAGE":
 			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {panic(protocolError)}
 			broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
 
 		case "TCCHAT_DISCONNECT":
-			fmt.Println("TCCHAT_DISCONNECT")
+			for i := 0; i<len(aConn); i++ {
+				if msgPieces[1] == aConn[i].name {
+					i = len(aConn)
+					aConn[i].conn.Close()
+					aConn = append(aConn[:i], aConn[i+1:]...)
+					broadcastChan <- "TCCHAT_USEROUT\t"+msgPieces[1]
+				}
+			}
 
-		default panic (protocolError)
+		default : panic(protocolError)
 		}
 	}
 }
