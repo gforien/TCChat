@@ -6,76 +6,79 @@ import (
 	"net"
 	"bufio"
 	"os"
+	"errors"
 )
 
 var (
-	nickname string
-	userName []string
-
 	inputChan = make(chan string)
 	receiveChan = make(chan string)
 	conn net.Conn
 	connectionError error
+	protocolError = errors.New("Received message doesn't respect TC-Chat protocol.")
 )
-
-type Server struct {
-	name string
-}
 
 func main() {
 
-	/*    // Enter server address
 	reader := bufio.NewReader(os.Stdin)
-	//fmt.Println("Enter the server adress and port (0.0.0.0:0000): ")
+
+	// Enter server address
+	fmt.Println("Enter the server adress and port (0.0.0.0:0000): ")
 	serverAdress, err := reader.ReadString('\n')
+	if err != nil {panic(err)}
 	serverAdress = strings.TrimSuffix(serverAdress, "\n")
+	if "" == serverAdress {serverAdress = "127.0.0.1:2000"}
+
 	// Enter nickname
 	fmt.Println("\nEnter Your Nickname: ")
 	nickname, err := reader.ReadString('\n')
-	if err != nil {
-	panic(err)
-}
-// Connect to server
-conn, err := net.Dial("tcp", serverAdress)
-if err != nil {
-panic(err)
-}*/
+	if err != nil {panic(err)}
+	nickname = strings.TrimSuffix(nickname, "\n")
+	if "" == nickname {nickname = "defaulName"}
 
-nickname = "Gabriel"
-conn, connectionError = net.Dial("tcp", "127.0.0.1:2000")
-if connectionError != nil {
-	panic(connectionError)
-}
+	//create a file for displaying server's message
+	f, err := os.Create("/tmp/TCChat_"+nickname) // acces the file with : tail -f /tmp/TCChat_[nickname]
+	if err != nil {panic(err)}
 
-go getInput()
-go getMsg()
+	//connecting to the server
+	conn, connectionError = net.Dial("tcp", serverAdress)
+	if connectionError != nil {
+		panic(connectionError)
+	}
 
-// Send first message
-go func() {inputChan <- "TCCHAT_REGISTER\t"+"Gabriel"}()
+	// launch the management of sent messages and receive messages
+	go getMsg()
+	go getInput(nickname)
 
-for {
-	select {
-	case input, ok := <-inputChan:
-		if !ok {
-			fmt.Println("Channel is closed !")
-			break
+	// Send first message
+	conn.Write([]byte("TCCHAT_REGISTER\t"+nickname + "\n"))
+
+	// displaying messages
+	for {
+		select {
+		case input, ok := <-inputChan:
+			if !ok {
+				fmt.Println("Channel is closed !")
+				break
+			}
+			conn.Write([]byte(input + "\n"))
+			fmt.Println("sending : "+input)
+
+		case msg, ok := <-receiveChan:
+			if !ok {
+				fmt.Println("Channel is closed !")
+				break
+			}
+			fmt.Println(msg)
+			_ , err := f.WriteString(msg)
+			if err != nil {panic(err)}
 		}
-		conn.Write([]byte(input + "\n"))
-		fmt.Println(input)
-	case msg, ok := <-receiveChan:
-		if !ok {
-			fmt.Println("Channel is closed !")
-			break
-		}
-		fmt.Println("NEW MSG :"+msg)
 	}
 }
-}
 
-func getInput() {
+
+func getInput(nickname string) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("Text to send: ")
 		text, err := reader.ReadString('\n')
 		text = strings.TrimSuffix(text, "\n")
 		if err != nil {
@@ -84,6 +87,7 @@ func getInput() {
 		inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 	}
 }
+
 
 func getMsg() {
 	var msgPieces []string
@@ -98,27 +102,24 @@ func getMsg() {
 		text = strings.TrimSuffix(text, "\n")
 
 		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
-		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == ""{
-			fmt.Println(msgPieces)
-			panic("Error: Received message doesn't respect TC-Chat protocol.")
-		}
+
+		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == "" {panic(protocolError)}
 
 		switch msgPieces[0] {
+			case "TCCHAT_WELCOME":
+				receiveChan <- "Welcome on the server : " + msgPieces [1]
 
-		case "TCCHAT_WELCOME":
-			receiveChan <- "WELCOME"
+			case "TCCHAT_USERIN":
+				receiveChan <- "User in : " + msgPieces [1]
 
-		case "TCCHAT_USERIN":
-			receiveChan <- "USER IN"
+			case "TCCHAT_USEROUT":
+				receiveChan <- "User out : " + msgPieces [1]
 
-		case "TCCHAT_USEROUT":
-			receiveChan <- "USER OUT"
+			case "TCCHAT_BCAST":
+				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {panic(protocolError)}
+				receiveChan <- msgPieces[1]+" say : "+msgPieces[2]
 
-		case "TCCHAT_BCAST":
-			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
-				panic("Error: Received message doesn't respect TC-Chat protocol.")
-			}
-			receiveChan <- "USER "+msgPieces[1]+" SAID "+msgPieces[2]
+			default : panic(protocolError)
 		}
 	}
 }
