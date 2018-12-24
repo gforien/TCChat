@@ -15,10 +15,11 @@ var (
 	conn net.Conn
 	connectionError error
 	protocolError = errors.New("Received message doesn't respect TC-Chat protocol.")
+	isConnected bool
 )
 
 func main() {
-
+	isConnected = true
 	reader := bufio.NewReader(os.Stdin)
 
 	// Enter server address
@@ -36,39 +37,38 @@ func main() {
 	if "" == nickname {nickname = "defaulName"}
 
 	//create a file for displaying server's message
-	f, err := os.Create("/tmp/TCChat_"+nickname) // acces the file with : tail -f /tmp/TCChat_[nickname]
-	if err != nil {panic(err)}
+	f, errFile := os.Create("/tmp/TCChat_"+nickname) // acces the file with : tail -f /tmp/TCChat_[nickname]
+	if errFile != nil {panic(err)}
 
 	//connecting to the server
 	conn, connectionError = net.Dial("tcp", serverAdress)
-	if connectionError != nil {
-		panic(connectionError)
-	}
+	if connectionError != nil {panic(connectionError)}
 
 	// launch the management of sent messages and receive messages
 	go getMsg()
 	go getInput(nickname)
 
 	// Send first message
-	conn.Write([]byte("TCCHAT_REGISTER\t"+nickname + "\n"))
+	_ ,errCo := conn.Write([]byte("TCCHAT_REGISTER\t"+nickname + "\n"))
+	if errCo != nil {panic(errCo)}
 
 	// displaying messages
-	for {
+	for isConnected {
 		select {
 		case input, ok := <-inputChan:
 			if !ok {
 				fmt.Println("Channel is closed !")
 				break
 			}
-			conn.Write([]byte(input + "\n"))
-			fmt.Println("sending : "+input)
+			fmt.Println("sending : "+input) // this print is for debugging, our own message is display with the reception of TCCHAT_BCAST
+			_, err := conn.Write([]byte(input + "\n"))
+			if err != nil {panic (err)}
 
 		case msg, ok := <-receiveChan:
 			if !ok {
 				fmt.Println("Channel is closed !")
 				break
 			}
-			fmt.Println(msg)
 			_ , err := f.WriteString(msg)
 			if err != nil {panic(err)}
 		}
@@ -80,11 +80,14 @@ func getInput(nickname string) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		text, err := reader.ReadString('\n')
+		if err != nil {panic(err)}
 		text = strings.TrimSuffix(text, "\n")
-		if err != nil {
-			panic(err)
+		if "DISCONNECT" == text {
+			inputChan <- "TCCHAT_DISCONNECT\t"+nickname
+			// l'arret ce fait lors de l'erreur provoqué par la fermeture de la co par le serveur
+		} else {
+			inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 		}
-		inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 	}
 }
 
@@ -96,7 +99,6 @@ func getMsg() {
 	for {
 		text, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("text = "+text)
 			panic(err)
 		}
 		text = strings.TrimSuffix(text, "\n")
