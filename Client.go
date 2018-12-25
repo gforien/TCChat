@@ -57,7 +57,6 @@ func main() {
 				fmt.Println("Channel is closed !")
 				break
 			}
-			fmt.Println("sending : "+input) // this print is for debugging, our own message is display with the reception of TCCHAT_BCAST
 			_, err := conn.Write([]byte(input + "\n"))
 			if err != nil {panic (err)}
 

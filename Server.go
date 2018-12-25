@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"bufio"
 	"strings"
+	"os"
 )
 
 type Client struct {
@@ -14,45 +15,77 @@ type Client struct {
 
 var (
 	aConn = make([]Client, 0)
-	serverName = "TCChat Server"
+	serverName string
 	// channels definition
 	connectChan = make(chan net.Conn)
 	broadcastChan = make(chan string)
+	writeLog = make(chan string)
 
 	invalidProtocol = "Received message doesn't respect TC-Chat protocol."
 )
 
 func main() {
+	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("Launching server...")
-	listener, err := net.Listen("tcp", "127.0.0.1:2000")
+	// Enter server address
+	fmt.Println("Enter the server adress and port (0.0.0.0:0000): ")
+	serverAdress, err := reader.ReadString('\n')
+	if err != nil {panic(err)}
+	serverAdress = strings.TrimSuffix(serverAdress, "\n")
+	if "" == serverAdress {serverAdress = "127.0.0.1:2000"}
+
+	// Enter serverName
+	fmt.Println("\nEnter The Server Name: ")
+	str, err := reader.ReadString('\n')
+	serverName = str
+	if err != nil {panic(err)}
+	serverName = strings.TrimSuffix(serverName, "\n")
+	if "" == serverName {serverName = "TCChat_Server"}
+
+	//create a file for displaying the logs
+	f, errFile := os.Create("/tmp/TCChat_"+serverName) // acces the file with : tail -f /tmp/TCChat_[serverName]
+	if errFile != nil {panic(errFile)}
+
+	//Launching the server
+	fmt.Println("Launching server : "+serverName)
+	listener, err := net.Listen("tcp", serverAdress)
 	if err != nil {
 		panic(err)
 	}
 
-	go getConn(listener)
+	go getConn(listener) //listen to new connection
+	go getInput() //waiting for input
 
 	// mainloop
 	for {
 		select {
 		case onConnection := <-connectChan:
-			fmt.Println("NEW CONN")
+			_ , err := f.WriteString("NEW CONNECTION"+"\n")
+			if err != nil {panic(err)}
 			go sendMessage(Client{conn: onConnection, name : "undefined"}, "TCCHAT_WELCOME\t"+serverName)
 			go getMsg(onConnection)
 
 		case onBroadcast := <-broadcastChan:
-			fmt.Println("BROADCAST : "+onBroadcast)
+			_ , err := f.WriteString("BROADCAST : "+onBroadcast+"\n")
+			if err != nil {panic(err)}
 			for i := 0; i<len(aConn); i++ {
 				go sendMessage(aConn[i], onBroadcast)
 			}
+
+		case onLog := <- writeLog :
+			_ , err := f.WriteString(onLog+"\n")
+			if err != nil {panic(err)}
 		}
 	}
 }
 
+//Handle message from a given client
 func getMsg(conn net.Conn) {
+
 	var msgPieces []string
 	reader := bufio.NewReader(conn)
 
+	// if the method panic the loop condition become false, goroutine stop
 	isConnected := true
 	defer func() {
 		if r := recover(); r != nil {
@@ -61,6 +94,7 @@ func getMsg(conn net.Conn) {
 		}
 	}()
 
+	// handling the messages
 	for isConnected{
 		text, err := reader.ReadString('\n')
 		if err != nil {
@@ -84,7 +118,7 @@ func getMsg(conn net.Conn) {
 
 		case "TCCHAT_MESSAGE":
 			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
-				fmt.Println(invalidProtocol)
+				writeLog <- invalidProtocol
 			} else {
 				broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
 			}
@@ -92,11 +126,12 @@ func getMsg(conn net.Conn) {
 		case "TCCHAT_DISCONNECT":
 			disconnect(conn)
 
-		default : fmt.Println(invalidProtocol)
+		default : writeLog <- invalidProtocol
 		}
 	}
 }
 
+//Handle new client connection
 func getConn(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
@@ -108,7 +143,35 @@ func getConn(listener net.Listener) {
 	}
 }
 
+// handle a input stream for the server
+func getInput () {
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {panic(err)}
+		input = strings.TrimSuffix(input, "\n")
+		writeLog <- "INPUT : "+input
+		msgPieces := strings.Split(input,"\t")
+		switch msgPieces[0] {
+		case "/broadcast" :
+			broadcastChan <- "TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[1]
+		case "/send" :
+			for i := 0; i<len(aConn); i++ {
+				if msgPieces[1] == aConn[i].name {
+					go sendMessage(aConn[i],"TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[2])
+				}
+			}
+		case "/disconnect" :
+			for i := 0; i<len(aConn); i++ {
+				if msgPieces[1] == aConn[i].name {
+					aConn[i].conn.Close()
+				}
+			}
+		}
+	}
+}
 
+// message and disconnect function
 func sendMessage(client Client, msg string) {
 	client.conn.Write([]byte(msg + "\n"))
 }
