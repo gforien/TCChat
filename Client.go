@@ -6,7 +6,6 @@ import (
 	"net"
 	"bufio"
 	"os"
-	"errors"
 )
 
 var (
@@ -14,12 +13,10 @@ var (
 	receiveChan = make(chan string)
 	conn net.Conn
 	connectionError error
-	protocolError = errors.New("Received message doesn't respect TC-Chat protocol.")
-	isConnected bool
+	invalidProtocol = "Received message doesn't respect TC-Chat protocol."
 )
 
 func main() {
-	isConnected = true
 	reader := bufio.NewReader(os.Stdin)
 
 	// Enter server address
@@ -38,7 +35,7 @@ func main() {
 
 	//create a file for displaying server's message
 	f, errFile := os.Create("/tmp/TCChat_"+nickname) // acces the file with : tail -f /tmp/TCChat_[nickname]
-	if errFile != nil {panic(err)}
+	if errFile != nil {panic(errFile)}
 
 	//connecting to the server
 	conn, connectionError = net.Dial("tcp", serverAdress)
@@ -52,8 +49,8 @@ func main() {
 	_ ,errCo := conn.Write([]byte("TCCHAT_REGISTER\t"+nickname + "\n"))
 	if errCo != nil {panic(errCo)}
 
-	// displaying messages
-	for isConnected {
+	// displaying messages loop
+	for {
 		select {
 		case input, ok := <-inputChan:
 			if !ok {
@@ -98,14 +95,14 @@ func getMsg() {
 
 	for {
 		text, err := reader.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
+		if err != nil {panic(err)}
 		text = strings.TrimSuffix(text, "\n")
 
 		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
 
-		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == "" {panic(protocolError)}
+		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == "" {
+			msgPieces = make([]string, 1)
+		}
 
 		switch msgPieces[0] {
 			case "TCCHAT_WELCOME":
@@ -118,10 +115,13 @@ func getMsg() {
 				receiveChan <- "User out : " + msgPieces [1]
 
 			case "TCCHAT_BCAST":
-				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {panic(protocolError)}
-				receiveChan <- msgPieces[1]+" say : "+msgPieces[2]
+				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+					fmt.Println(invalidProtocol)
+				}else {
+					receiveChan <- msgPieces[1]+" say : "+msgPieces[2]
+				}
 
-			default : panic(protocolError)
+			default : fmt.Println(invalidProtocol)
 		}
 	}
 }
