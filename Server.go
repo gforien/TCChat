@@ -60,14 +60,10 @@ func main() {
 	for {
 		select {
 		case onConnection := <-connectChan:
-			_ , err := f.WriteString("NEW CONNECTION"+"\n")
-			if err != nil {panic(err)}
 			go sendMessage(Client{conn: onConnection, name : "undefined"}, "TCCHAT_WELCOME\t"+serverName)
 			go getMsg(onConnection)
 
 		case onBroadcast := <-broadcastChan:
-			_ , err := f.WriteString("BROADCAST : "+onBroadcast+"\n")
-			if err != nil {panic(err)}
 			for i := 0; i<len(aConn); i++ {
 				go sendMessage(aConn[i], onBroadcast)
 			}
@@ -81,7 +77,6 @@ func main() {
 
 // handle message from a given client
 func getMsg(conn net.Conn) {
-
 	nickname := "undefined"
 	var msgPieces []string
 	reader := bufio.NewReader(conn)
@@ -98,36 +93,31 @@ func getMsg(conn net.Conn) {
 	// handling the messages
 	for isConnected{
 		text, err := reader.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-		text = strings.TrimSuffix(text, "\n")
+		if err != nil {panic(err)}
+		writeLog <- "RECEIVE : "+text
 
+		text = strings.TrimSuffix(text, "\n")
 		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
 
 		switch msgPieces[0] {
-
-		case "TCCHAT_REGISTER":
+		case "TCCHAT_REGISTER" :
 			if len(msgPieces) < 2 || msgPieces[1] == "" {
 				writeLog <- invalidProtocol
+			}else {
+				notYetConnect := !disconnect(conn)
+				if notYetConnect {
+					nickname = msgPieces[1]
+					aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
+					broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
+				}
 			}
-			notYetConnect := !disconnect(conn)
-			if notYetConnect {
-				nickname = msgPieces[1]
-				aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
-				broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
-			}
-
-		case "TCCHAT_MESSAGE":
+		case "TCCHAT_MESSAGE" :
 			if len(msgPieces) < 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 				writeLog <- invalidProtocol
 			} else {
 				broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
 			}
-
-		case "TCCHAT_DISCONNECT":
-			disconnect(conn)
-
+		case "TCCHAT_DISCONNECT" : disconnect(conn)
 		case "TCCHAT_USERS" :
 			for i := 0; i<len(aConn); i++ {
 				if nickname == aConn[i].name {
@@ -135,7 +125,6 @@ func getMsg(conn net.Conn) {
 					i=len(aConn)
 				}
 			}
-
 		case "TCCHAT_TELL" :
 			if len(msgPieces) < 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 				writeLog <- invalidProtocol
@@ -147,7 +136,6 @@ func getMsg(conn net.Conn) {
 					}
 				}
 			}
-
 		default : writeLog <- invalidProtocol
 		}
 	}
@@ -157,47 +145,43 @@ func getMsg(conn net.Conn) {
 func getConn(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
-			panic(err)
-		}
-
+		if err != nil {panic(err)}
+		writeLog <- "NEW CONNECTION"+"\n"
 		connectChan <- conn
 	}
 }
 
 // handle a input stream for the server
 func getInput () {
+	var msgPieces []string
+	reader := bufio.NewReader(os.Stdin)
+
 	for {
-		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {panic(err)}
 		input = strings.TrimSuffix(input, "\n")
 		writeLog <- "INPUT : "+input
-		msgPieces := strings.SplitN(input," ",2)
+		msgPieces = strings.SplitN(input," ",2)
 
 		switch msgPieces[0] {
-
-		case "/broadcast" :
-			broadcastChan <- "TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[1]
-
+		case "/help" : writeLog <- "/help : print this help page\n/users : print the list of connected users\n/broadcast <messagePayload> : send a message to all connected users\n/tell <recipient>\t<message_payload> : send a message to a given recipient\n/disconnect <clientName> : disconnect the client"
+		case "/broadcast" : broadcastChan <- "TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[1]
+		case "/users" : writeLog <- "\n"+giveUsers()
 		case "/tell" :
-			msgPieces = strings.SplitN(msgPieces[1]," ",2)
+			msgPieces = strings.SplitN(msgPieces[1],"\t",2)
 			for i := 0; i<len(aConn); i++ {
 				if msgPieces[0] == aConn[i].name {
 					go sendMessage(aConn[i],"TCCHAT_PRIVATE\t"+serverName+"\t"+msgPieces[1])
 					i=len(aConn)
 				}
 			}
-
 		case "/disconnect" :
 			for i := 0; i<len(aConn); i++ {
 				if msgPieces[1] == aConn[i].name {
 					aConn[i].conn.Close()
 				}
 			}
-
-		case "/users" :
-			writeLog <- "\n"+giveUsers()
+		default : writeLog <- "Undefined command. Try /help to see available ones."
 		}
 	}
 }
@@ -205,6 +189,7 @@ func getInput () {
 // other function :
 
 func sendMessage(client Client, msg string) {
+	writeLog <- "SEND : "+msg+"\n"
 	client.conn.Write([]byte(msg + "\n"))
 }
 

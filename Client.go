@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	nickname string
 	inputChan = make(chan string)
 	receiveChan = make(chan string)
 	conn net.Conn
@@ -28,8 +29,9 @@ func main() {
 
 	// Enter nickname
 	fmt.Println("\nEnter Your Nickname: ")
-	nickname, err := reader.ReadString('\n')
+	str, err := reader.ReadString('\n')
 	if err != nil {panic(err)}
+	nickname = str
 	nickname = strings.TrimSuffix(nickname, "\n")
 	if "" == nickname {nickname = "defaultName"}
 
@@ -43,7 +45,7 @@ func main() {
 
 	// launch the management of sent messages and receive messages
 	go getMsg()
-	go getInput(nickname)
+	go getInput()
 
 	// Send first message
 	_ ,errCo := conn.Write([]byte("TCCHAT_REGISTER\t"+nickname + "\n"))
@@ -72,21 +74,29 @@ func main() {
 }
 
 
-func getInput(nickname string) {
+func getInput() {
+	var msgPieces []string
 	reader := bufio.NewReader(os.Stdin)
+
 	for {
 		text, err := reader.ReadString('\n')
 		if err != nil {panic(err)}
 		text = strings.TrimSuffix(text, "\n")
-		msgPieces := strings.SplitN(text, " ", 2)
 
-		switch msgPieces[0] {
-		case "/disconnect" : inputChan <- "TCCHAT_DISCONNECT"
-		case "/mp" :
-			msgPieces = strings.SplitN(msgPieces[1], " ", 2)
-			inputChan <- "TCCHAT_TELL\t"+msgPieces[0]+"\t"+msgPieces[1]
-		case "/users" : inputChan <- "TCCHAT_USERS"
-		default : inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
+		if strings.HasPrefix(text,"/") {
+			msgPieces = strings.SplitN(text, " ", 2)
+			switch msgPieces[0] {
+			case "/help" : receiveChan <- "/help : print this help page\n/disconnect : close the client\n/users : print the list of connected users\n/mp <recipient>\t<message_payload> : send a private message to a given recipient"
+			case "/disconnect" : inputChan <- "TCCHAT_DISCONNECT"
+			case "/mp" :
+				msgPieces = strings.SplitN(msgPieces[1], "\t", 2)
+				inputChan <- "TCCHAT_TELL\t"+msgPieces[0]+"\t"+msgPieces[1]
+			case "/users" : inputChan <- "TCCHAT_USERS"
+			default : receiveChan <- "Undefined command. Try /help to see available ones."
+			}
+		}else {
+			fmt.Println ("YESS")
+			inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 		}
 	}
 }
@@ -98,44 +108,29 @@ func getMsg() {
 
 	for {
 		text, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println(err)
-			panic(err)
-		}
+		if err != nil {panic(err)}
 		text = strings.TrimSuffix(text, "\n")
-
 		msgPieces = strings.SplitN(text, "\t", 3)
 
-		if len(msgPieces) < 2 || msgPieces[1] == "" {
-			msgPieces = make([]string, 1)
-		}
+		if len(msgPieces) < 2 || msgPieces[1] == "" {msgPieces = make([]string, 1)}
 
 		switch msgPieces[0] {
-			case "TCCHAT_WELCOME":
-				receiveChan <- "Welcome on the server : " + msgPieces [1]
-
-			case "TCCHAT_USERIN":
-				receiveChan <- "User in : " + strings.Split(msgPieces[1], "\n")[0]
-
-			case "TCCHAT_USEROUT":
-				receiveChan <- "User out : " + msgPieces [1]
-
+			case "TCCHAT_WELCOME" : receiveChan <- "Welcome on the server : " + msgPieces [1]
+			case "TCCHAT_USERIN" : receiveChan <- "User in : " + strings.Split(msgPieces[1], "\n")[0]
+			case "TCCHAT_USEROUT" : receiveChan <- "User out : " + msgPieces [1]
+			case "TCCHAT_USERLIST" : receiveChan <- strings.Replace(msgPieces[1],"\r","\n",-1)
 			case "TCCHAT_BCAST":
 				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 					fmt.Println(invalidProtocol)
 				}else {
 					receiveChan <- msgPieces[1]+" say : "+msgPieces[2]
 				}
-
 			case "TCCHAT_PRIVATE" :
 				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 					fmt.Println(invalidProtocol)
 				}else {
 					receiveChan <- msgPieces[1]+" tell : "+msgPieces[2]
 				}
-			case "TCCHAT_USERLIST" :
-				receiveChan <- strings.Replace(msgPieces[1],"\r","\n",-1)
-
 			default : fmt.Println(invalidProtocol)
 		}
 	}
