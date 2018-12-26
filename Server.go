@@ -79,9 +79,10 @@ func main() {
 	}
 }
 
-//Handle message from a given client
+// handle message from a given client
 func getMsg(conn net.Conn) {
 
+	nickname := "undefined"
 	var msgPieces []string
 	reader := bufio.NewReader(conn)
 
@@ -103,21 +104,22 @@ func getMsg(conn net.Conn) {
 		text = strings.TrimSuffix(text, "\n")
 
 		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
-		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == ""{
-			msgPieces = make([]string, 1)
-		}
 
 		switch msgPieces[0] {
 
 		case "TCCHAT_REGISTER":
+			if len(msgPieces) < 2 || msgPieces[1] == "" {
+				writeLog <- invalidProtocol
+			}
 			notYetConnect := !disconnect(conn)
 			if notYetConnect {
+				nickname = msgPieces[1]
 				aConn = append(aConn, Client{conn: conn, name: msgPieces[1]})
 				broadcastChan <-"TCCHAT_USERIN\t"+msgPieces[1]
 			}
 
 		case "TCCHAT_MESSAGE":
-			if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+			if len(msgPieces) < 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 				writeLog <- invalidProtocol
 			} else {
 				broadcastChan <- "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]
@@ -126,12 +128,32 @@ func getMsg(conn net.Conn) {
 		case "TCCHAT_DISCONNECT":
 			disconnect(conn)
 
+		case "TCCHAT_USERS" :
+			for i := 0; i<len(aConn); i++ {
+				if nickname == aConn[i].name {
+					go sendMessage(aConn[i],"TCCHAT_USERLIST\t"+strings.Replace(giveUsers(),"\n","\r",-1))
+					i=len(aConn)
+				}
+			}
+
+		case "TCCHAT_TELL" :
+			if len(msgPieces) < 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+				writeLog <- invalidProtocol
+			} else {
+				for i := 0; i<len(aConn); i++ {
+					if msgPieces[1] == aConn[i].name {
+						go sendMessage(aConn[i],"TCCHAT_PRIVATE\t"+nickname+"\t"+msgPieces[2])
+						i=len(aConn)
+					}
+				}
+			}
+
 		default : writeLog <- invalidProtocol
 		}
 	}
 }
 
-//Handle new client connection
+// handle new client connection
 func getConn(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
@@ -151,27 +173,37 @@ func getInput () {
 		if err != nil {panic(err)}
 		input = strings.TrimSuffix(input, "\n")
 		writeLog <- "INPUT : "+input
-		msgPieces := strings.Split(input,"\t")
+		msgPieces := strings.SplitN(input," ",2)
+
 		switch msgPieces[0] {
+
 		case "/broadcast" :
 			broadcastChan <- "TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[1]
-		case "/send" :
+
+		case "/tell" :
+			msgPieces = strings.SplitN(msgPieces[1]," ",2)
 			for i := 0; i<len(aConn); i++ {
-				if msgPieces[1] == aConn[i].name {
-					go sendMessage(aConn[i],"TCCHAT_BCAST\t"+serverName+"\t"+msgPieces[2])
+				if msgPieces[0] == aConn[i].name {
+					go sendMessage(aConn[i],"TCCHAT_PRIVATE\t"+serverName+"\t"+msgPieces[1])
+					i=len(aConn)
 				}
 			}
+
 		case "/disconnect" :
 			for i := 0; i<len(aConn); i++ {
 				if msgPieces[1] == aConn[i].name {
 					aConn[i].conn.Close()
 				}
 			}
+
+		case "/users" :
+			writeLog <- "\n"+giveUsers()
 		}
 	}
 }
 
-// message and disconnect function
+// other function :
+
 func sendMessage(client Client, msg string) {
 	client.conn.Write([]byte(msg + "\n"))
 }
@@ -187,4 +219,12 @@ func disconnect (conn net.Conn) bool{
 		}
 	}
 	return false
+}
+
+func giveUsers () string {
+	var str string
+	for i := 0; i<len(aConn); i++ {
+		str += aConn[i].name + "\n"
+	}
+	return str
 }

@@ -78,11 +78,15 @@ func getInput(nickname string) {
 		text, err := reader.ReadString('\n')
 		if err != nil {panic(err)}
 		text = strings.TrimSuffix(text, "\n")
-		if "DISCONNECT" == text {
-			inputChan <- "TCCHAT_DISCONNECT\t"+nickname
-			// l'arret ce fait lors de l'erreur provoqué par la fermeture de la co par le serveur
-		} else {
-			inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
+		msgPieces := strings.SplitN(text, " ", 2)
+
+		switch msgPieces[0] {
+		case "/disconnect" : inputChan <- "TCCHAT_DISCONNECT"
+		case "/mp" :
+			msgPieces = strings.SplitN(msgPieces[1], " ", 2)
+			inputChan <- "TCCHAT_TELL\t"+msgPieces[0]+"\t"+msgPieces[1]
+		case "/users" : inputChan <- "TCCHAT_USERS"
+		default : inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 		}
 	}
 }
@@ -94,12 +98,15 @@ func getMsg() {
 
 	for {
 		text, err := reader.ReadString('\n')
-		if err != nil {panic(err)}
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
 		text = strings.TrimSuffix(text, "\n")
 
-		msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
+		msgPieces = strings.SplitN(text, "\t", 3)
 
-		if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == "" {
+		if len(msgPieces) < 2 || msgPieces[1] == "" {
 			msgPieces = make([]string, 1)
 		}
 
@@ -108,30 +115,26 @@ func getMsg() {
 				receiveChan <- "Welcome on the server : " + msgPieces [1]
 
 			case "TCCHAT_USERIN":
-				receiveChan <- "User in : " + msgPieces [1]
+				receiveChan <- "User in : " + strings.Split(msgPieces[1], "\n")[0]
 
 			case "TCCHAT_USEROUT":
 				receiveChan <- "User out : " + msgPieces [1]
 
-<<<<<<< HEAD
-func userout (nom_user string) {
-	fmt.Println(nom_user, "est OUT #Micdrop")
-	for i := 0; i<len(userName); i++ {
-		if (userName[i] == nom_user) {
-			i = len(nom_user)
-			userName[i] = userName[len(userName)-1]
-			userName = userName[:len(userName)-1]
-		}
-	}
-}
-=======
 			case "TCCHAT_BCAST":
 				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
 					fmt.Println(invalidProtocol)
 				}else {
 					receiveChan <- msgPieces[1]+" say : "+msgPieces[2]
 				}
->>>>>>> test
+
+			case "TCCHAT_PRIVATE" :
+				if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+					fmt.Println(invalidProtocol)
+				}else {
+					receiveChan <- msgPieces[1]+" tell : "+msgPieces[2]
+				}
+			case "TCCHAT_USERLIST" :
+				receiveChan <- strings.Replace(msgPieces[1],"\r","\n",-1)
 
 			default : fmt.Println(invalidProtocol)
 		}

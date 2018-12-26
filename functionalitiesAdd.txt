@@ -1,0 +1,28 @@
+NEW PROTOCOL MESSAGES :
+	Client originate message
+		TCCHAT_USERS\n
+			when receive, the server return a TCCHAT_USERLIST with the list of connected client separate by \n
+
+		TCCHAT_TELL\t<recipient>\t<message_payload>\n
+			use to send a private message at the recipient
+
+	Server originate message
+		TCCHAT_USERLIST\t<user1>\r...\n
+			the list of connected user
+
+		TCCHAT_PRIVATE\t<Nickname>\t<Payload>\n
+			a private message from Nickname
+
+NEW COMMANDS
+	Client Commands
+		/mp <message_payload>
+		/users
+		/disconnect
+
+	Server Commands
+		/broadcast <messagePayload>
+		/tell <messagePayload>
+		/disconnect <clientName>
+		/users
+
+/!\ L'utilisation de commandes nécessite l'interdiction de l'espace dans le nom !!
