@@ -95,7 +95,6 @@ func getInput() {
 			default : receiveChan <- "Undefined command. Try /help to see available ones."
 			}
 		}else {
-			fmt.Println ("YESS")
 			inputChan <- "TCCHAT_MESSAGE\t"+nickname+"\t"+text
 		}
 	}
