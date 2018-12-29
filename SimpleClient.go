@@ -1,71 +1,161 @@
-//Simple Client, you have to manually implement the protocol
-
 package main
 
 import (
-	"fmt"
-	"net"
-	"bufio"
-	"os"
-)
+    "strings"
+    "fmt"
+    "flag"
+    "net"
+    "bufio"
+    "log"
+    "time"
+    "strconv"
+    "math/rand"
 
-var (
-	inputChan = make(chan string)
-	receiveChan = make(chan string)
-	conn net.Conn
-	connectionError error
-	invalidProtocol = "Received message doesn't respect TC-Chat protocol."
+    "github.com/marcusolsson/tui-go"
 )
 
 func main() {
+    var (
+        nickname *string            // the user name
+        conn net.Conn               // the socket, we send messages via conn.Write()
+        connectionErr error
+        history *tui.Box            // the main window, we add new messages to this window via history.Append()
+        serverName *tui.Label       // the Label in the sidebar containing the server name
+        userList *tui.Label         // the Label in the sidebar containing the user list
+        input *tui.Entry            // the bottom bar, we treat user input via input.onSubmit()
+    )
 
-	//connecting to the server
-	conn, connectionError = net.Dial("tcp", "127.0.0.1:2000")
-	if connectionError != nil {panic(connectionError)}
+    //------------------------------------------------//
+    //           1. Graphical initialization
+    //------------------------------------------------//
+    serverName = tui.NewLabel("undefined")
+    userList = tui.NewLabel("undefined")
+    sidebar := tui.NewVBox(
+        tui.NewLabel("SERVER"),
+        serverName,
+        tui.NewLabel(""),
+        tui.NewLabel("USERS"),
+        userList,
+        tui.NewSpacer(),
+    )
+    sidebar.SetBorder(true)
 
-	// launch the management of sent messages and receive messages
-	go getMsg()
-	go getInput()
+    history = tui.NewVBox()
+    historyScroll := tui.NewScrollArea(history)
+    historyScroll.SetAutoscrollToBottom(true)
+    historyBox := tui.NewVBox(historyScroll)
+    historyBox.SetBorder(true)
 
-	// displaying messages loop
-	for {
-		select {
-		case input, ok := <-inputChan:
-			if !ok {
-				fmt.Println("Channel is closed !")
-				break
-			}
-			fmt.Print("\nsending : "+input)
-			_, err := conn.Write([]byte(input ))
-			if err != nil {panic (err)}
+    input = tui.NewEntry()
+    input.SetFocused(true)
+    input.SetSizePolicy(tui.Expanding, tui.Maximum)
+    inputBox := tui.NewHBox(input)
+    inputBox.SetBorder(true)
+    inputBox.SetSizePolicy(tui.Expanding, tui.Maximum)
 
-		case msg, ok := <-receiveChan:
-			if !ok {
-				fmt.Println("Channel is closed !")
-				break
-			}
-			fmt.Print("\nreceiving : "+msg)
-		}
-	}
+    // pack the whole thing in a Box and create ui object
+    chat := tui.NewVBox(historyBox, inputBox)
+    chat.SetSizePolicy(tui.Expanding, tui.Expanding)
+    root := tui.NewHBox(sidebar, chat)
+    ui, uiErr := tui.New(root)
+    if uiErr != nil {
+        log.Fatal(uiErr)
+    }
+
+    ui.SetKeybinding("Esc", func() { ui.Quit() })
+
+
+    //------------------------------------------------//
+    //             2. Client initialization
+    //------------------------------------------------//
+    // if the client doesn't provide a nickname, we define a random one
+    rand.Seed(time.Now().Unix())
+    randomNickname := "client-"+strconv.Itoa(rand.Intn(9999))
+
+    // server adress and nickname are command-line arguments
+    address := flag.String("address", "127.0.0.1:2000", "IP address and port of the server")
+    nickname = flag.String("nickname", randomNickname, "nickname used to identify yourself")
+    flag.Parse()
+
+    conn, connectionErr = net.Dial("tcp", *address)
+    if connectionErr != nil {panic(connectionErr)}
+
+    // messages are received and treated in an infinite loop
+    go getMsg(conn, history, ui)
+
+    // when <Enter> is pressed, text is treated by getInput() and input buffer is flushed
+    input.OnSubmit(func(e *tui.Entry) {
+        getInput(e.Text(), nickname, conn, history)
+        input.SetText("")
+    })
+
+    // we have to send a first message to register the nickname to the server
+    _ , firstMessageErr := conn.Write([]byte("TCCHAT_REGISTER\t"+ *nickname +"\n"))
+    if firstMessageErr != nil {
+        fmt.Println("Error in main(), to register username\n"+ firstMessageErr.Error())
+    }
+
+    // launch the graphical mainloop()
+    if mainloopErr := ui.Run(); mainloopErr != nil {
+        log.Fatal(mainloopErr)
+    }
 }
 
 
-func getInput() {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {panic(err)}
-		inputChan <- text
-	}
+func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
+    var err error
+
+    // user is not allowed to send an empty string
+    if text == "" {
+        return
+    }
+
+    // if it's not command, we just check the size and send the whole text as a TCCHAT_MESSAGE
+    if len(text) > 140 {
+        history.Append(tui.NewLabel("Error : your message could not be sent because it has more than 140 characters."))
+        return
+    }
+    _, err = conn.Write([]byte("TCCHAT_MESSAGE\t"+*nickname+"\t"+text+"\n"))
+    if err != nil {
+        fmt.Println("Error in getInput(), block else{}\n"+err.Error())
+        return
+    }
 }
 
 
-func getMsg() {
-	reader := bufio.NewReader(conn)
+func getMsg(conn net.Conn, history *tui.Box, ui tui.UI) {
+    var msgPieces []string
+    reader := bufio.NewReader(conn)
+    invalidProtocol := "Received message doesn't respect TC-Chat protocol."
 
-	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {panic(err)}
-		receiveChan <- text
-	}
+    for {
+        text, err := reader.ReadString('\n')
+        if err != nil {
+            fmt.Println("Error in getMsg(), at ReadString()\n"+err.Error())
+            break
+        }
+        text = strings.TrimSuffix(text, "\n")
+        msgPieces = strings.SplitN(text, "\t", 3)
+
+        if len(msgPieces) < 2 || msgPieces[1] == "" {msgPieces = make([]string, 1)}
+
+        switch msgPieces[0] {
+            case "TCCHAT_WELCOME" : history.Append(tui.NewLabel("Welcome on the server : " + msgPieces[1]))
+            case "TCCHAT_USERIN" : history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
+            case "TCCHAT_USEROUT" : history.Append(tui.NewLabel("User out : " + msgPieces [1]))
+
+            case "TCCHAT_BCAST":
+                if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+                    fmt.Println(invalidProtocol)
+                    break
+                } else {
+                    history.Append(tui.NewLabel(msgPieces[1]+" says : "+msgPieces[2]))
+                }
+
+            default :
+                fmt.Println(invalidProtocol)
+                break
+        }
+        ui.Repaint()
+    }
 }
