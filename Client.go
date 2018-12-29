@@ -9,6 +9,7 @@ import (
     "log"
     "time"
     "strconv"
+    "os"
     "math/rand"
 
     "github.com/marcusolsson/tui-go"
@@ -191,7 +192,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
             case "TCCHAT_USEROUT":
                 history.Append(tui.NewLabel("User out : " + msgPieces [1]))
             case "TCCHAT_USERLIST":
-                userList.SetText(strings.Replace(msgPieces[1],"\r","\n",-1)))
+                userList.SetText(strings.Replace(msgPieces[1],"\r","\n",-1))
 
             case "TCCHAT_BCAST":
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
