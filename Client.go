@@ -132,7 +132,7 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
 
         case "/mp" :
             msgPieces = strings.SplitN(msgPieces[1], "\t", 2)
-            _, err = conn.Write([]byte("TCCHAT_TELL\t"+msgPieces[0]+"\t"+msgPieces[1]+"\n"))
+            _, err = conn.Write([]byte("TCCHAT_PRIVATE\t"+*nickname+"\t"+msgPieces[0]+"\t"+msgPieces[1]+"\n"))
             if err != nil {
                 fmt.Println("Error in getInput() case /mp\n"+err.Error())
                 return
@@ -183,7 +183,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
             case "TCCHAT_WELCOME":
                 history.Append(tui.NewLabel("Welcome on the server : " + msgPieces[1]))
                 serverName.SetText(msgPieces[1])
-                
+
             case "TCCHAT_USERIN" : history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
             case "TCCHAT_USEROUT" : history.Append(tui.NewLabel("User out : " + msgPieces [1]))
             case "TCCHAT_USERLIST":
@@ -197,12 +197,12 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
                     history.Append(tui.NewLabel(msgPieces[1]+" says : "+msgPieces[2]))
                 }
 
-            case "TCCHAT_PRIVATE" :
+            case "TCCHAT_PERSONAL" :
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                     fmt.Println(invalidProtocol)
                     break
                 } else {
-                    history.Append(tui.NewLabel(msgPieces[1]+" tells you : "+msgPieces[2]))
+                    history.Append(tui.NewLabel(msgPieces[1]+" says in private : "+msgPieces[2]))
                 }
 
             default :

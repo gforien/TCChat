@@ -18,11 +18,7 @@ func main() {
         userMap = make(map[net.Conn]*Client)    // map of Clients
         address *string                         // address and port of the server
         serverName *string                      // name of the server
-<<<<<<< HEAD
-        //msgChan = make(chan string)           // channel in which all message will be put
         mutex = &sync.Mutex{}
-=======
->>>>>>> dd0ae68a14f7a14d8ffd2a0ccdd204eb26abb74d
     )
 
     // address and server name are command line arguments
@@ -44,7 +40,7 @@ func main() {
 }
 
 
-func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Client,mutex *sync.Mutex) {
+func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Client, mutex *sync.Mutex) {
     fmt.Println("getConn():\tlistening on new connections.")
 
     for {
@@ -79,6 +75,7 @@ func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Cl
 func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mutex *sync.Mutex) {
     fmt.Println("\ngetMsg():\tlistening on messages from <"+userMap[conn].name+">")
     var msgPieces []string
+    var wholeMessage string
     reader := bufio.NewReader(conn)
 
     for {
@@ -87,8 +84,8 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
         if err != nil {
             fmt.Println("getMsg():\terror on reading message from <"+userMap[conn].name+"> ("+err.Error()+") -> force disconnect")
             go sendToAll(userMap, "TCCHAT_USEROUT\t"+ userMap[conn].name +"\n")
-           
-            
+
+
             fmt.Println("getMsg():\tUSEROUT\t"+ userMap[conn].name +" sent to all")
             //mutex.Lock()
             _, ok := userMap[conn]
@@ -104,7 +101,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             fmt.Println("getMsg():\tuserMap updated -> "+map2string(userMap))
         }
         text = strings.TrimSuffix(text, "\n")
-        msgPieces = strings.SplitN(strings.Split(text, "\n")[0], "\t", 3)
+        msgPieces = strings.SplitN(text, "\t", 4)
         if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == ""{
             fmt.Println("getMsg():\terror on parsing message from <"+userMap[conn].name+"> -> break")
             break
@@ -122,6 +119,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             go sendToAll(userMap, "TCCHAT_USERIN\t"+ userMap[conn].name +"\n")
             fmt.Println("getMsg():\tUSERIN\t"+ userMap[conn].name +" sent to all")
 
+
         // upon MESSAGE, we send BCAST to all clients
         case "TCCHAT_MESSAGE":
             fmt.Println("getMsg():\tgot 'MESSAGE\t"+msgPieces[1]+"\t"+msgPieces[2]+"' from <"+userMap[conn].name+">")
@@ -131,6 +129,47 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             }
             go sendToAll(userMap, "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]+"\n")
             fmt.Println("getMsg():\tBCAST\t"+msgPieces[1]+"\t"+msgPieces[2]+" sent to all")
+
+
+        // upon PRIVATE, we send PERSONAL to particular client
+        case "TCCHAT_PRIVATE":
+            fmt.Println("getMsg():\tgot 'PRIVATE\t"+msgPieces[1]+"\t"+msgPieces[2]+"\t"+msgPieces[3]+"' from <"+userMap[conn].name+">")
+            if len(msgPieces) != 4 || msgPieces[2] == "" || msgPieces[3] == "" || len(msgPieces[3]) > 140 {
+                fmt.Println("getMsg():\terror on parsing message (classed PRIVATE) from <"+userMap[conn].name+" -> break")
+                break
+            }
+            found := false
+            wholeMessage = "TCCHAT_PERSONAL\t"+msgPieces[1]+"\t"+msgPieces[3]+"\n"
+            for userConn, userClient := range userMap {
+                if userClient.name == msgPieces[2] {
+                    found = true
+                    _ , err := userConn.Write([]byte(wholeMessage))
+                    if err != nil {
+                        msgCut := strings.TrimSuffix(wholeMessage, "\n")
+                        fmt.Println("getMsg():\terror when sending '"+msgCut+"' to <"+msgPieces[2]+"> ("+err.Error()+")")
+                    } else {
+                        fmt.Println("getMsg():\tPERSONAL\t"+msgPieces[1]+"\t"+msgPieces[3]+" sent to <"+msgPieces[2]+">")
+                    }
+                    break
+                }
+            }
+            if !found {
+                fmt.Println("getMsg():\tcan't deliver pm, user <"+msgPieces[2]+"> not found ! ")
+            }
+
+
+        // upon USERS, we send USERLIST \t client1 \r client2 \r client3 \n
+        case "TCCHAT_USERS":
+            fmt.Println("getMsg():\tUSERS from <"+userMap[conn].name+">")
+            wholeMessage = "TCCHAT_USERLIST\t"+giveUsers(userMap)+"\n"
+            _ , err := conn.Write([]byte(wholeMessage))
+            if err != nil {
+                msgCut := strings.TrimSuffix(wholeMessage, "\n")
+                fmt.Println("getMsg():\terror when sending '"+msgCut+"' to <"+userMap[conn].name+"> ("+err.Error()+")")
+            } else {                    
+                fmt.Println("getMsg():\t"+wholeMessage+" sent to <"+userMap[conn].name+">")
+            }
+
 
         // upon DISCONNECT, we delete the user from userMap and send USEROUT to all clients
         case "TCCHAT_DISCONNECT":
@@ -154,7 +193,7 @@ func sendToAll(userMap map[net.Conn]*Client, wholeMessage string) {
     for userConn, userClient := range userMap {
         _ , err := userConn.Write([]byte(wholeMessage))
         if err != nil {
-            msgCut := strings.Split(wholeMessage, "\n")[0]
+            msgCut := strings.TrimSuffix(wholeMessage, "\n")
             fmt.Println("sendToAll():\terror when sending '"+msgCut+"' to <"+userClient.name+"> : "+err.Error())
         }
     }
@@ -166,4 +205,12 @@ func map2string(userMap map[net.Conn]*Client) string {
         str += key.RemoteAddr().String()+":"+val.name+", "
     }
     return str + " ]"
+}
+
+func giveUsers (userMap map[net.Conn]*Client) string {
+    var str string
+    for _, val := range userMap {
+        str += val.name + "\r"
+    }
+    return strings.TrimSuffix(str, "\r")
 }
