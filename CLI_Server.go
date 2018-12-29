@@ -6,6 +6,7 @@ import (
     "flag"
     "bufio"
     "strings"
+    "sync"
 )
 
 type Client struct {
@@ -18,6 +19,7 @@ func main() {
         address *string                         // address and port of the server
         serverName *string                      // name of the server
         //msgChan = make(chan string)           // channel in which all message will be put
+        mutex = &sync.Mutex{}
     )
 
     // address and server name are command line arguments
@@ -35,11 +37,11 @@ func main() {
     }
 
     // launch connection infinite loop, which will launch all other goroutines
-    getConn(serverName, listener, userMap)
+    getConn(serverName, listener, userMap, mutex)
 }
 
 
-func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Client) {
+func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Client,mutex *sync.Mutex) {
     fmt.Println("getConn():\tlistening on new connections.")
 
     for {
@@ -52,8 +54,10 @@ func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Cl
         }
 
         // 1) we update the user map
+        mutex.Lock()
         userMap[conn] = &Client{name : "undefined"}
         fmt.Println("getConn():\tuserMap updated -> "+map2string(userMap))
+        mutex.Unlock()
 
         // 2) we send WELCOME
         fmt.Println("getConn():\tsend message 'TCCHAT_WELCOME\t"+ *serverName+"' to <"+userMap[conn].name+">")
@@ -64,12 +68,12 @@ func getConn(serverName *string, listener net.Listener, userMap map[net.Conn]*Cl
         }
 
         // 3) we listen to him, because he's supposed to send REGISTER right after connecting
-        go getMsg(serverName, conn, userMap)
+        go getMsg(serverName, conn, userMap,mutex)
     }
 }
 
 
-func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client) {
+func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mutex *sync.Mutex) {
     fmt.Println("\ngetMsg():\tlistening on messages from <"+userMap[conn].name+">")
     var msgPieces []string
     reader := bufio.NewReader(conn)
@@ -80,10 +84,16 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client) {
         if err != nil {
             fmt.Println("getMsg():\terror on reading message from <"+userMap[conn].name+"> ("+err.Error()+") -> force disconnect")
             go sendToAll(userMap, "TCCHAT_USEROUT\t"+ userMap[conn].name +"\n")
+           
+            
             fmt.Println("getMsg():\tUSEROUT\t"+ userMap[conn].name +" sent to all")
+            //mutex.Lock()
             _, ok := userMap[conn]
+            //mutex.Unlock()
             if ok {
+				mutex.Lock()
                 delete(userMap, conn)
+                mutex.Unlock()
             } else {
                 fmt.Println("getMsg():\terror on disconnecting <"+userMap[conn].name+"> ("+err.Error()+") -> break")
                 break
@@ -102,7 +112,9 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client) {
         // upon REGISTER, we send USERIN to all clients
         case "TCCHAT_REGISTER":
             fmt.Println("getMsg():\tgot 'REGISTER\t"+msgPieces[1]+"' from <"+userMap[conn].name+">")
+            mutex.Lock()
             userMap[conn].name = msgPieces[1]
+            mutex.Unlock()
             fmt.Println("getMsg():\tuserMap updated -> "+map2string(userMap))
             go sendToAll(userMap, "TCCHAT_USERIN\t"+ userMap[conn].name +"\n")
             fmt.Println("getMsg():\tUSERIN\t"+ userMap[conn].name +" sent to all")
@@ -122,9 +134,13 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client) {
             fmt.Println("getMsg():\tDISCONNECT from <"+userMap[conn].name+">")
             go sendToAll(userMap, "TCCHAT_USEROUT\t"+ userMap[conn].name +"\n")
             fmt.Println("getMsg():\tUSEROUT\t"+ userMap[conn].name +" sent to all")
+            //mutex.Lock()
             _, ok := userMap[conn]
+            //mutex.Unlock()
             if ok {
+				mutex.Lock()
                 delete(userMap, conn)
+                mutex.Unlock()
             }
             fmt.Println("getMsg():\tuserMap updated -> "+map2string(userMap))
         }
