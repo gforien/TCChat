@@ -102,7 +102,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
         }
         text = strings.TrimSuffix(text, "\n")
         msgPieces = strings.SplitN(text, "\t", 4)
-        if len(msgPieces) < 2 || msgPieces[0] == "" || msgPieces[1] == ""{
+        if len(msgPieces) < 1 || msgPieces[0] == "" {
             fmt.Println("getMsg():\terror on parsing message from <"+userMap[conn].name+"> -> break")
             break
         }
@@ -111,6 +111,10 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
 
         // upon REGISTER, we send USERIN to all clients
         case "TCCHAT_REGISTER":
+            if len(msgPieces) != 2 || msgPieces[1] == "" {
+                fmt.Println("getMsg():\terror on parsing message from <"+userMap[conn].name+"> -> break")
+                break
+            }
             fmt.Println("getMsg():\tgot 'REGISTER\t"+msgPieces[1]+"' from <"+userMap[conn].name+">")
             mutex.Lock()
             userMap[conn].name = msgPieces[1]
@@ -122,22 +126,22 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
 
         // upon MESSAGE, we send BCAST to all clients
         case "TCCHAT_MESSAGE":
-            fmt.Println("getMsg():\tgot 'MESSAGE\t"+msgPieces[1]+"\t"+msgPieces[2]+"' from <"+userMap[conn].name+">")
-            if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
+            if len(msgPieces) != 3 || msgPieces[1] == "" || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                 fmt.Println("getMsg():\terror on parsing message (classed MESSAGE) from <"+userMap[conn].name+" -> break")
                 break
             }
+            fmt.Println("getMsg():\tgot 'MESSAGE\t"+msgPieces[1]+"\t"+msgPieces[2]+"' from <"+userMap[conn].name+">")
             go sendToAll(userMap, "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]+"\n")
             fmt.Println("getMsg():\tBCAST\t"+msgPieces[1]+"\t"+msgPieces[2]+" sent to all")
 
 
         // upon PRIVATE, we send PERSONAL to particular client
         case "TCCHAT_PRIVATE":
-            fmt.Println("getMsg():\tgot 'PRIVATE\t"+msgPieces[1]+"\t"+msgPieces[2]+"\t"+msgPieces[3]+"' from <"+userMap[conn].name+">")
-            if len(msgPieces) != 4 || msgPieces[2] == "" || msgPieces[3] == "" || len(msgPieces[3]) > 140 {
+            if len(msgPieces) != 4 || msgPieces[1] == "" || msgPieces[2] == "" || msgPieces[3] == "" || len(msgPieces[3]) > 140 {
                 fmt.Println("getMsg():\terror on parsing message (classed PRIVATE) from <"+userMap[conn].name+" -> break")
                 break
             }
+            fmt.Println("getMsg():\tgot 'PRIVATE\t"+msgPieces[1]+"\t"+msgPieces[2]+"\t"+msgPieces[3]+"' from <"+userMap[conn].name+">")
             found := false
             wholeMessage = "TCCHAT_PERSONAL\t"+msgPieces[1]+"\t"+msgPieces[3]+"\n"
             for userConn, userClient := range userMap {

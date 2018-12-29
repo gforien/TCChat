@@ -131,7 +131,7 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
             }
 
         case "/mp" :
-            msgPieces = strings.SplitN(msgPieces[1], "\t", 2)
+            msgPieces = strings.SplitN(msgPieces[1], " ", 2)
             _, err = conn.Write([]byte("TCCHAT_PRIVATE\t"+*nickname+"\t"+msgPieces[0]+"\t"+msgPieces[1]+"\n"))
             if err != nil {
                 fmt.Println("Error in getInput() case /mp\n"+err.Error())
