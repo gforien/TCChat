@@ -129,6 +129,7 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
                 fmt.Println("Error in getInput() case /disconnect\n")
                 panic(err)
             }
+            os.Exit(0)
 
         case "/mp" :
             msgPieces = strings.SplitN(msgPieces[1], " ", 2)
@@ -137,6 +138,7 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
                 fmt.Println("Error in getInput() case /mp\n"+err.Error())
                 return
             }
+            history.Append(tui.NewLabel("to "+msgPieces[0]+" (in private) : "+msgPieces[1]))
 
         case "/users" :
             _, err = conn.Write([]byte("TCCHAT_USERS\n"))
@@ -184,10 +186,12 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
                 history.Append(tui.NewLabel("Welcome on the server : " + msgPieces[1]))
                 serverName.SetText(msgPieces[1])
 
-            case "TCCHAT_USERIN" : history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
-            case "TCCHAT_USEROUT" : history.Append(tui.NewLabel("User out : " + msgPieces [1]))
+            case "TCCHAT_USERIN":
+                history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
+            case "TCCHAT_USEROUT":
+                history.Append(tui.NewLabel("User out : " + msgPieces [1]))
             case "TCCHAT_USERLIST":
-                history.Append(tui.NewLabel(strings.Replace(msgPieces[1],"\r","\n",-1)))
+                userList.SetText(strings.Replace(msgPieces[1],"\r","\n",-1)))
 
             case "TCCHAT_BCAST":
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
