@@ -17,7 +17,6 @@ func main() {
         userMap = make(map[net.Conn]*Client)    // map of Clients
         address *string                         // address and port of the server
         serverName *string                      // name of the server
-        //msgChan = make(chan string)           // channel in which all message will be put
     )
 
     // address and server name are command line arguments

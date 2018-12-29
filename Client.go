@@ -81,7 +81,7 @@ func main() {
     if connectionErr != nil {panic(connectionErr)}
 
     // messages are received and treated in an infinite loop
-    go getMsg(conn, history, ui)
+    go getMsg(conn, history, serverName, userList, ui)
 
     // when <Enter> is pressed, text is treated by getInput() and input buffer is flushed
     input.OnSubmit(func(e *tui.Entry) {
@@ -163,7 +163,7 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
 }
 
 
-func getMsg(conn net.Conn, history *tui.Box, ui tui.UI) {
+func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tui.Label, ui tui.UI) {
     var msgPieces []string
     reader := bufio.NewReader(conn)
     invalidProtocol := "Received message doesn't respect TC-Chat protocol."
@@ -180,10 +180,14 @@ func getMsg(conn net.Conn, history *tui.Box, ui tui.UI) {
         if len(msgPieces) < 2 || msgPieces[1] == "" {msgPieces = make([]string, 1)}
 
         switch msgPieces[0] {
-            case "TCCHAT_WELCOME" : history.Append(tui.NewLabel("Welcome on the server : " + msgPieces[1]))
+            case "TCCHAT_WELCOME":
+                history.Append(tui.NewLabel("Welcome on the server : " + msgPieces[1]))
+                serverName.SetText(msgPieces[1])
+                
             case "TCCHAT_USERIN" : history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
             case "TCCHAT_USEROUT" : history.Append(tui.NewLabel("User out : " + msgPieces [1]))
-            case "TCCHAT_USERLIST" : history.Append(tui.NewLabel(strings.Replace(msgPieces[1],"\r","\n",-1)))
+            case "TCCHAT_USERLIST":
+                history.Append(tui.NewLabel(strings.Replace(msgPieces[1],"\r","\n",-1)))
 
             case "TCCHAT_BCAST":
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
