@@ -18,8 +18,11 @@ func main() {
         userMap = make(map[net.Conn]*Client)    // map of Clients
         address *string                         // address and port of the server
         serverName *string                      // name of the server
+<<<<<<< HEAD
         //msgChan = make(chan string)           // channel in which all message will be put
         mutex = &sync.Mutex{}
+=======
+>>>>>>> dd0ae68a14f7a14d8ffd2a0ccdd204eb26abb74d
     )
 
     // address and server name are command line arguments
