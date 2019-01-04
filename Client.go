@@ -130,7 +130,6 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
             history.Append(tui.NewLabel(help))
 
         case "/ban" :
-            msgPieces = strings.SplitN(msgPieces[1], " ", 2)
             _, err = conn.Write([]byte("TCCHAT_BAN\t"+*nickname+"\t"+msgPieces[1]+"\n"))
             if err != nil {
                 fmt.Println("Error in getInput() case /ban\n"+err.Error())
@@ -235,7 +234,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
                     fmt.Println(invalidProtocol)
                     continue
                 } else {
-                    history.Append(tui.NewLabel(msgPieces[1]+" says in private : "+msgPieces[2]))
+                    history.Append(tui.NewLabel(msgPieces[1]+" says (in private) : "+msgPieces[2]))
                 }
 
             default :
