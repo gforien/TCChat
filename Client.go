@@ -79,7 +79,10 @@ func main() {
     flag.Parse()
 
     conn, connectionErr = net.Dial("tcp", *address)
-    if connectionErr != nil {panic(connectionErr)}
+    if connectionErr != nil {
+        fmt.Println("Essayez de lancer le serveur d'abord ;)")
+        panic(connectionErr)
+    }
 
     // messages are received and treated in an infinite loop
     go getMsg(conn, history, serverName, userList, ui)
@@ -95,6 +98,7 @@ func main() {
     if firstMessageErr != nil {
         fmt.Println("Error in main(), to register username\n"+ firstMessageErr.Error())
     }
+    conn.Write([]byte("TCCHAT_USERS\n"))
 
     // launch the graphical mainloop()
     if mainloopErr := ui.Run(); mainloopErr != nil {
@@ -175,7 +179,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
         text, err := reader.ReadString('\n')
         if err != nil {
             fmt.Println("Error in getMsg(), at ReadString()\n"+err.Error())
-            break
+            continue
         }
         text = strings.TrimSuffix(text, "\n")
         msgPieces = strings.SplitN(text, "\t", 3)
@@ -197,7 +201,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
             case "TCCHAT_BCAST":
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                     fmt.Println(invalidProtocol)
-                    break
+                    continue
                 } else {
                     history.Append(tui.NewLabel(msgPieces[1]+" says : "+msgPieces[2]))
                 }
@@ -205,14 +209,14 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
             case "TCCHAT_PERSONAL" :
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                     fmt.Println(invalidProtocol)
-                    break
+                    continue
                 } else {
                     history.Append(tui.NewLabel(msgPieces[1]+" says in private : "+msgPieces[2]))
                 }
 
             default :
                 fmt.Println(invalidProtocol)
-                break
+                continue
         }
         ui.Repaint()
     }
