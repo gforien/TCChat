@@ -19,10 +19,3 @@ NEW COMMANDS
 		/mp <recipient>\t<message_payload>
 		/users
 		/disconnect
-
-	Server Commands
-		/help
-		/broadcast <messagePayload>
-		/tell <recipient>\t<message_payload>
-		/disconnect <clientName>
-		/users
