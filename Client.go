@@ -98,6 +98,7 @@ func main() {
     if firstMessageErr != nil {
         fmt.Println("Error in main(), to register username\n"+ firstMessageErr.Error())
     }
+    // fetch user list
     conn.Write([]byte("TCCHAT_USERS\n"))
 
     // launch the graphical mainloop()
@@ -128,6 +129,14 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
         case "/help" :
             history.Append(tui.NewLabel(help))
 
+        case "/ban" :
+            msgPieces = strings.SplitN(msgPieces[1], " ", 2)
+            _, err = conn.Write([]byte("TCCHAT_BAN\t"+*nickname+"\t"+msgPieces[1]+"\n"))
+            if err != nil {
+                fmt.Println("Error in getInput() case /ban\n"+err.Error())
+                return
+            }
+
         case "/disconnect" :
             _, err = conn.Write([]byte("TCCHAT_DISCONNECT\n"))
             if err != nil {
@@ -149,6 +158,13 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
             _, err = conn.Write([]byte("TCCHAT_USERS\n"))
             if err != nil {
                 fmt.Println("Error in getInput() case /users\n"+err.Error())
+                return
+            }
+
+        case "/raw" :
+            _, err = conn.Write([]byte(msgPieces[1]+"\n"))
+            if err != nil {
+                fmt.Println("Error in getInput() case /raw\n"+err.Error())
                 return
             }
 
@@ -179,7 +195,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
         text, err := reader.ReadString('\n')
         if err != nil {
             fmt.Println("Error in getMsg(), at ReadString()\n"+err.Error())
-            continue
+            return
         }
         text = strings.TrimSuffix(text, "\n")
         msgPieces = strings.SplitN(text, "\t", 3)
@@ -193,8 +209,16 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
 
             case "TCCHAT_USERIN":
                 history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
+                conn.Write([]byte("TCCHAT_USERS\n"))
+
             case "TCCHAT_USEROUT":
                 history.Append(tui.NewLabel("User out : " + msgPieces [1]))
+                conn.Write([]byte("TCCHAT_USERS\n"))
+
+            case "TCCHAT_USERBAN":
+                history.Append(tui.NewLabel("User out : " + msgPieces [2] + "(banned by " + msgPieces[1] + ")"))
+                conn.Write([]byte("TCCHAT_USERS\n"))
+
             case "TCCHAT_USERLIST":
                 userList.SetText(strings.Replace(msgPieces[1],"\r","\n",-1))
 

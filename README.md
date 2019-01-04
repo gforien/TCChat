@@ -1,9 +1,18 @@
 # TCChat (Go)
 
 ## Fonctionnalités ajoutées
-Les contraites spécifiées dans le sujet ont été conservées dans les fonctionnalités ajoutées (champs ne contenant pas de \t, messages inférieurs à 140 caractères).
-- Le client peut envoyer un message à un seul utilisateur avec `TCCHAT_PRIVATE\t<nickname>\t<recipient>\t<message_payload>\n`. Le serveur transmet alors `TCCHAT_PERSONAL\t<Nickname>\t<Payload>\n` à l'utilisateur concerné.
-- Le client peut demander la liste des utilisateurs avec `TCCHAT_USERS\n`, auquel cas le serveur lui répond `TCCHAT_USERLIST\t<user1>\r...\r<userN>\n`.
+Nous avons ajouté 3 fonctionnalités essentielles à un chat : envoyer/recevoir des messages privés, demander la liste des utilisateurs connectés, et bannir un utilisateur.
+Les contraintes du protocole spécifiées dans le sujet ont été conservées pour ces nouvelles fonctionnalités (les noms d'utilisateurs ne doivent **pas contenir de \t**, les messages doivent être **inférieurs à 140 caractères**).
+
+Le client envoie donc :
+1) `TCCHAT_PRIVATE\t<nickname>\t<recipient>\t<message_payload>\n`
+2) `TCCHAT_USERS\n`
+3) `TCCHAT_BAN\t<nickname>\t<user_to_ban>\n`
+
+Auquels le serveur répond respectivement :
+1) `TCCHAT_PERSONAL\t<Nickname>\t<Payload>\n`
+2) `TCCHAT_USERLIST\t<user1>\r...\r<userN>\n`.
+3) `TCCHAT_USERBAN\t<user_who_banned>\t<user_banned>\n`
 
 
 ## Annexe - Rappel du cycle de vie d'un projet git

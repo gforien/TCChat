@@ -87,6 +87,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
         text, err := reader.ReadString('\n')
         if err != nil {
             fmt.Println("getMsg():\terror on reading message from <"+userName+"> ("+err.Error()+") -> force disconnect")
+            go sendToAll(userMap, mutex, "TCCHAT_USEROUT\t"+ userName +"\n")
             disconnect(conn, userName, userMap, mutex)
             return
         }
@@ -106,7 +107,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
                 fmt.Println("getMsg():\terror on parsing message (classed REGISTER) from <"+userName+"> -> continue")
                 continue
             } else {
-                fmt.Println("getMsg():\tgot "+text+" from <"+userName+">")
+                fmt.Println("\033[32mgetMsg():\033[0m\tgot "+text+" from <"+userName+">")
             }
 
             mutex.Lock()
@@ -115,13 +116,13 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             alreadyRegistered = userMap[conn].registered
             userMap[conn].registered = true
             mutex.Unlock()
-            fmt.Println("getMsg():\tuserMap updated -> "+map2string(userMap))
+            fmt.Println("\033[32mgetMsg():\033[0m\tuserMap updated -> "+map2string(userMap))
 
             if alreadyRegistered {
+                go sendToAll(userMap, mutex, "TCCHAT_USEROUT\t"+ userName +"\n")
                 disconnect(conn, userName, userMap, mutex)
                 return                
             }
-
             go sendToAll(userMap, mutex, "TCCHAT_USERIN\t"+ userName +"\n")
 
 
@@ -137,6 +138,24 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             go sendToAll(userMap, mutex, "TCCHAT_BCAST\t"+msgPieces[1]+"\t"+msgPieces[2]+"\n")
 
 
+        // upon BAN, we send USERBAN to all clients and disconnect the user in question
+        case "TCCHAT_BAN":
+            if len(msgPieces) != 3 || msgPieces[1] == "" || msgPieces[2] == "" {
+                fmt.Println("getMsg():\terror on parsing message (classed BAN) from <"+userName+" -> continue")
+                continue
+            } else {
+                fmt.Println("getMsg():\tgot "+text+" from <"+userName+">")
+            }
+
+            destConn, destName, found := findUser(msgPieces[2], userMap, mutex)
+            if !found {
+                fmt.Println("getMsg():\tcan't ban, user <"+msgPieces[2]+"> not found ! ")
+            } else {
+                go sendToAll(userMap, mutex, "TCCHAT_USERBAN\t"+msgPieces[1]+"\t"+msgPieces[2]+"\n")
+                disconnect(destConn, destName, userMap, mutex)
+            }
+
+
         // upon PRIVATE, we send PERSONAL to particular client
         case "TCCHAT_PRIVATE":
             if len(msgPieces) != 4 || msgPieces[1] == "" || msgPieces[2] == "" || msgPieces[3] == "" || len(msgPieces[3]) > 140 {
@@ -150,8 +169,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             if !found {
                 fmt.Println("getMsg():\tcan't deliver pm, user <"+msgPieces[2]+"> not found ! ")
             } else {
-                wholeMessage = "TCCHAT_PERSONAL\t"+msgPieces[1]+"\t"+msgPieces[3]+"\n"
-                sendTo(destConn, destName, wholeMessage)
+                sendTo(destConn, destName, "TCCHAT_PERSONAL\t"+msgPieces[1]+"\t"+msgPieces[3]+"\n")
             }
 
 
@@ -162,9 +180,10 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             sendTo(conn, userName, wholeMessage)
 
 
-        // upon DISCONNECT, we delete the user from userMap and send USEROUT to all clients
+        // upon DISCONNECT, send USEROUT to all clients and disconnect it
         case "TCCHAT_DISCONNECT":
-            fmt.Println("getMsg():\tgot DISCONNECT from <"+userName+">")
+            fmt.Println("\033[31mgetMsg():\033[0m\t\tgot DISCONNECT from <"+userName+">")
+            go sendToAll(userMap, mutex, "TCCHAT_USEROUT\t"+ userName +"\n")
             disconnect(conn, userName, userMap, mutex)
             return
         }
@@ -178,6 +197,8 @@ func sendTo(conn net.Conn, userName string, wholeMessage string) {
     if err != nil {
         fmt.Println("sendTo():\terror when sending '"+messageCut+"' to <"+userName+"> ("+err.Error()+")")
     } else {
+        // si on affiche la liste des utilisateurs, il faut remplacer les \r
+        messageCut = strings.Replace(messageCut,"\r",", ",-1)
         fmt.Println("sendTo():\t'"+messageCut+"' successfully sent to <"+userName+">")
     }
 }
@@ -201,8 +222,6 @@ func sendToAll(userMap map[net.Conn]*Client, mutex *sync.Mutex, wholeMessage str
 }
 
 func disconnect(conn net.Conn, userName string, userMap map[net.Conn]*Client, mutex *sync.Mutex) {
-    go sendToAll(userMap, mutex, "TCCHAT_USEROUT\t"+ userName +"\n")
-
     mutex.Lock()
     _, ok := userMap[conn]
     mutex.Unlock()
@@ -210,7 +229,7 @@ func disconnect(conn net.Conn, userName string, userMap map[net.Conn]*Client, mu
         mutex.Lock()
         delete(userMap, conn)
         mutex.Unlock()
-        fmt.Println("disconnect():\tsuccessfully disconnected <"+userName+">")
+        fmt.Println("\033[31mdisconnect():\033[0m\tsuccessfully disconnected <"+userName+">")
     } else {
         fmt.Println("disconnect():\terror on disconnecting <"+userName+">")
         fmt.Println("disconnect():\tuserMap is now "+map2string(userMap))
