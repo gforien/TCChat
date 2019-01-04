@@ -11,6 +11,7 @@ import (
 
 type Client struct {
     name string
+    registered bool
 }
 
 func main() {
@@ -77,6 +78,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
     var userName string = userMap[conn].name
     var msgPieces []string
     var wholeMessage string
+    var alreadyRegistered bool
     reader := bufio.NewReader(conn)
 
     fmt.Println("getMsg():\tlistening on messages from <"+userName+">")
@@ -110,8 +112,15 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             mutex.Lock()
             userMap[conn].name = msgPieces[1]
             userName = msgPieces[1]
+            alreadyRegistered = userMap[conn].registered
+            userMap[conn].registered = true
             mutex.Unlock()
             fmt.Println("getMsg():\tuserMap updated -> "+map2string(userMap))
+
+            if alreadyRegistered {
+                disconnect(conn, userName, userMap, mutex)
+                return                
+            }
 
             go sendToAll(userMap, mutex, "TCCHAT_USERIN\t"+ userName +"\n")
 
