@@ -187,9 +187,6 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
 
 func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tui.Label, ui tui.UI) {
     var msgPieces []string
-    var coloredName = make(map[string]string)
-    var colors = [7]string{ "\\e[30m", "\\e[31m", "\\e[32m", "\\e[33m",
-                            "\\e[34m", "\\e[35m", "\\e[36m"}
     reader := bufio.NewReader(conn)
     invalidProtocol := "Received message doesn't respect TC-Chat protocol."
 
@@ -210,7 +207,7 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
                 serverName.SetText(msgPieces[1])
 
             case "TCCHAT_USERIN":
-                history.Append(tui.NewLabel("User in : " + msgPieces[1]))
+                history.Append(tui.NewLabel("User in : " + strings.Split(msgPieces[1], "\n")[0]))
                 conn.Write([]byte("TCCHAT_USERS\n"))
 
             case "TCCHAT_USEROUT":
@@ -222,27 +219,14 @@ func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tu
                 conn.Write([]byte("TCCHAT_USERS\n"))
 
             case "TCCHAT_USERLIST":
-                str := ""
-                for _, name := range strings.Split(msgPieces[1], "\r") {
-                    _, exists := coloredName[name]
-                    if !exists {
-                        coloredName[name] = colors[rand.Intn(len(colors))]+name+colors[0]
-                    }
-                    str += coloredName[name]+"\n"
-                }
-                userList.SetText(str)
+                userList.SetText(strings.Replace(msgPieces[1],"\r","\n",-1))
 
             case "TCCHAT_BCAST":
                 if len(msgPieces) != 3 || msgPieces[2] == "" || len(msgPieces[2]) > 140 {
                     fmt.Println(invalidProtocol)
                     continue
                 } else {
-                    colored, exists := coloredName[msgPieces[1]]
-                    if exists {
-                        history.Append(tui.NewLabel(colored+" says : "+msgPieces[2]))
-                    } else {
-                        history.Append(tui.NewLabel(msgPieces[1]+" says : "+msgPieces[2]))
-                    }
+                    history.Append(tui.NewLabel(msgPieces[1]+" says : "+msgPieces[2]))
                 }
 
             case "TCCHAT_PERSONAL" :
