@@ -188,8 +188,8 @@ func getInput(text string, nickname *string, conn net.Conn, history *tui.Box) {
 func getMsg(conn net.Conn, history *tui.Box, serverName *tui.Label, userList *tui.Label, ui tui.UI) {
     var msgPieces []string
     var coloredName = make(map[string]string)
-    var colors = [7]string{ "\033[30m", "\033[31m", "\033[32m", "\033[33m",
-                            "\033[34m", "\033[35m", "\033[36m"}
+    var colors = [7]string{ "\e[30m", "\e[31m", "\e[32m", "\e[33m",
+                            "\e[34m", "\e[35m", "\e[36m"}
     reader := bufio.NewReader(conn)
     invalidProtocol := "Received message doesn't respect TC-Chat protocol."
 
