@@ -121,7 +121,7 @@ func getMsg(serverName *string, conn net.Conn, userMap map[net.Conn]*Client, mut
             if alreadyRegistered {
                 go sendToAll(userMap, mutex, "TCCHAT_USEROUT\t"+ userName +"\n")
                 disconnect(conn, userName, userMap, mutex)
-                return                
+                return
             }
             go sendToAll(userMap, mutex, "TCCHAT_USERIN\t"+ userName +"\n")
 
