@@ -75,7 +75,7 @@ func main() {
 
     // server adress and nickname are command-line arguments
     address := flag.String("address", "127.0.0.1:2000", "IP address and port of the server")
-    nickname = flag.String("nickname", randomNickname, "nickname used to identify yourself")
+    nickname = flag.String("name", randomNickname, "nickname used to identify yourself")
     flag.Parse()
 
     conn, connectionErr = net.Dial("tcp", *address)
