@@ -75,5 +75,5 @@ $ git stash pop                                           # restaure fichier1
 ```
 
 ##
-###### Rémi ARLANDA, Gabriel FORIEN, Rémi POLIDO, Romain THAURONT <br/>3TC INSA Lyon
+###### Rémi ARLANDA, Gabriel FORIEN, Victor POLIDO, Romain THAURONT <br/>Groupe 1-2<br/>3TC INSA Lyon
 ![Logo INSA Lyon](https://upload.wikimedia.org/wikipedia/commons/b/b9/Logo_INSA_Lyon_%282014%29.svg)
