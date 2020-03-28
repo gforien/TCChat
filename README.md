@@ -1,5 +1,7 @@
 # TCChat (Go)
 
+![Screenshot](screenshot.png)
+
 ## Installation, lancement
 Le paquet tui-go est nécessaire pour lancer le Client. On peut spécifier le nom et l'adresse, sinon ils auront des valeurs par défaut:
 ```
